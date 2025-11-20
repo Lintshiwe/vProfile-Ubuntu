@@ -1,5 +1,12 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/jammy64"
+  
+  # Celeron-optimized settings - ultra minimal
+  config.vm.disk :disk, size: "6GB", primary: true
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  
+  # Disable automatic box update checking for faster startup on Celeron
+  config.vm.box_check_update = false
 
   # Master Desktop Linux - Slade
   config.vm.define "slade" do |slade|
@@ -9,17 +16,50 @@ Vagrant.configure("2") do |config|
     
     slade.vm.provider "virtualbox" do |vb|
       vb.name = "Slade-Master-Desktop"
-      vb.memory = 4096
-      vb.cpus = 2
+      vb.memory = 512
+      vb.cpus = 1
       vb.gui = true
+      # Celeron optimization - minimal resources
+      vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+      vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+      vb.customize ["modifyvm", :id, "--audio", "none"]
+      vb.customize ["modifyvm", :id, "--usb", "off"]
+      vb.customize ["modifyvm", :id, "--usbehci", "off"]
+      vb.customize ["modifyvm", :id, "--vram", "12"]
+      vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
+      vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
+      vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
+      vb.customize ["modifyvm", :id, "--largepages", "on"]
+      vb.customize ["modifyvm", :id, "--ioapic", "on"]
     end
     
     slade.vm.provision "shell", inline: <<-SHELL
-      # Update system
+      # Ultra-minimal system for Celeron compatibility
+      export DEBIAN_FRONTEND=noninteractive
       sudo apt-get update
-      sudo apt-get install -y ubuntu-desktop-minimal
-      sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat
-      sudo apt-get install -y openssh-server ansible
+      
+      # Install bare minimum desktop (LXDE instead of full Ubuntu desktop)
+      sudo apt-get install -y --no-install-recommends lxde-core lxde-common
+      sudo apt-get install -y --no-install-recommends git curl wget vim htop neofetch figlet lolcat openssh-server
+      
+      # Remove heavy packages that come with Ubuntu
+      sudo apt-get remove -y --purge snapd firefox thunderbird libreoffice* 2>/dev/null || true
+      
+      # Ultra-aggressive cleanup for Celeron
+      sudo apt-get autoremove -y
+      sudo apt-get autoclean
+      sudo rm -rf /var/lib/apt/lists/*
+      sudo rm -rf /tmp/*
+      sudo rm -rf /var/tmp/*
+      sudo rm -rf /var/cache/*
+      sudo rm -rf /usr/share/doc/*
+      sudo rm -rf /usr/share/man/*
+      
+      # Limit journal to minimal size for Celeron
+      sudo journalctl --vacuum-size=10M
+      
+      # Optimize swappiness for low RAM
+      echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
       
       # Enable SSH
       sudo systemctl enable ssh
@@ -40,7 +80,7 @@ echo "║  Hostname: $(hostname)                                               �
 echo "║  User: $(whoami)                                                     ║" | lolcat
 echo "║  Date: $(date)                                                       ║" | lolcat
 echo "║                                                                      ║" | lolcat
-echo "║  Connected Nodes: ubuntu1, ubuntu2, ubuntu3, goldenfish             ║" | lolcat
+echo "║  Connected Nodes: ubuntu1, goldenfish                               ║" | lolcat
 echo "║  Control Panel: Available via SSH and Desktop                       ║" | lolcat
 echo "╚══════════════════════════════════════════════════════════════════════╝" | lolcat
 echo ""
@@ -48,8 +88,6 @@ neofetch
 echo ""
 echo "Available Commands:" | lolcat
 echo "  • connect-ubuntu1   : SSH to Ubuntu Node 1" | lolcat
-echo "  • connect-ubuntu2   : SSH to Ubuntu Node 2" | lolcat
-echo "  • connect-ubuntu3   : SSH to Ubuntu Node 3" | lolcat
 echo "  • connect-goldenfish: SSH to Golden Fish Node" | lolcat
 echo "  • cluster-status    : Check all nodes status" | lolcat
 echo "  • deploy-all        : Deploy to all nodes" | lolcat
@@ -62,16 +100,6 @@ EOF
 ssh vagrant@192.168.56.11
 EOF
       
-      sudo tee /usr/local/bin/connect-ubuntu2 > /dev/null << 'EOF'
-#!/bin/bash
-ssh vagrant@192.168.56.12
-EOF
-      
-      sudo tee /usr/local/bin/connect-ubuntu3 > /dev/null << 'EOF'
-#!/bin/bash
-ssh vagrant@192.168.56.13
-EOF
-      
       sudo tee /usr/local/bin/connect-goldenfish > /dev/null << 'EOF'
 #!/bin/bash
 ssh vagrant@192.168.56.14
@@ -80,34 +108,25 @@ EOF
       sudo tee /usr/local/bin/cluster-status > /dev/null << 'EOF'
 #!/bin/bash
 echo "Checking cluster status..." | lolcat
-for i in {11..14}; do
-  case $i in
-    11) name="Ubuntu1" ;;
-    12) name="Ubuntu2" ;;
-    13) name="Ubuntu3" ;;
-    14) name="GoldenFish" ;;
-  esac
-  if ping -c 1 192.168.56.$i &> /dev/null; then
-    echo "✅ $name (192.168.56.$i) - ONLINE" | lolcat
-  else
-    echo "❌ $name (192.168.56.$i) - OFFLINE" | lolcat
-  fi
-done
+if ping -c 1 192.168.56.11 &> /dev/null; then
+  echo "✅ Ubuntu1 (192.168.56.11) - ONLINE" | lolcat
+else
+  echo "❌ Ubuntu1 (192.168.56.11) - OFFLINE" | lolcat
+fi
+if ping -c 1 192.168.56.14 &> /dev/null; then
+  echo "✅ GoldenFish (192.168.56.14) - ONLINE" | lolcat
+else
+  echo "❌ GoldenFish (192.168.56.14) - OFFLINE" | lolcat
+fi
 EOF
       
       sudo tee /usr/local/bin/deploy-all > /dev/null << 'EOF'
 #!/bin/bash
 echo "Deploying to all nodes..." | lolcat
-for i in {11..14}; do
-  case $i in
-    11) name="Ubuntu1" ;;
-    12) name="Ubuntu2" ;;
-    13) name="Ubuntu3" ;;
-    14) name="GoldenFish" ;;
-  esac
-  echo "Deploying to $name..." | lolcat
-  # Add your deployment commands here
-done
+echo "Deploying to Ubuntu1..." | lolcat
+# Add your deployment commands here for ubuntu1
+echo "Deploying to GoldenFish..." | lolcat
+# Add your deployment commands here for goldenfish
 echo "Deployment completed!" | lolcat
 EOF
       
@@ -153,13 +172,40 @@ EOF
     
     worker.vm.provider "virtualbox" do |vb|
       vb.name = "Ubuntu-Node-1"
-      vb.memory = 4096
+      vb.memory = 256
       vb.cpus = 1
+      # Ultra-minimal for Celeron processors
+      vb.customize ["modifyvm", :id, "--audio", "none"]
+      vb.customize ["modifyvm", :id, "--usb", "off"]
+      vb.customize ["modifyvm", :id, "--usbehci", "off"]
+      vb.customize ["modifyvm", :id, "--vram", "8"]
+      vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
+      vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
+      vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
+      vb.customize ["modifyvm", :id, "--largepages", "on"]
     end
     
     worker.vm.provision "shell", inline: <<-SHELL
+      # Ultra-minimal installation for Celeron compatibility
+      export DEBIAN_FRONTEND=noninteractive
       sudo apt-get update
-      sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server
+      sudo apt-get install -y --no-install-recommends curl wget vim neofetch figlet lolcat openssh-server
+      
+      # Remove unnecessary packages
+      sudo apt-get remove -y --purge snapd 2>/dev/null || true
+      
+      # Aggressive cleanup for Celeron systems
+      sudo apt-get autoremove -y
+      sudo apt-get autoclean
+      sudo rm -rf /var/lib/apt/lists/*
+      sudo rm -rf /tmp/*
+      sudo rm -rf /var/tmp/*
+      sudo rm -rf /usr/share/doc/*
+      sudo rm -rf /usr/share/man/*
+      sudo journalctl --vacuum-size=5M
+      
+      # Optimize for low memory
+      echo "vm.swappiness=5" | sudo tee -a /etc/sysctl.conf
       
       # Create ubuntu1 user with default password
       sudo useradd -m -s /bin/bash ubuntu1
@@ -189,93 +235,7 @@ EOF
     SHELL
   end
 
-  # Ubuntu Node 2
-  config.vm.define "ubuntu2" do |worker|
-    worker.vm.hostname = "ubuntu2"
-    worker.vm.network "public_network", bridge: "auto"
-    worker.vm.network "private_network", ip: "192.168.56.12"
-    
-    worker.vm.provider "virtualbox" do |vb|
-      vb.name = "Ubuntu-Node-2"
-      vb.memory = 4096
-      vb.cpus = 1
-    end
-    
-    worker.vm.provision "shell", inline: <<-SHELL
-      sudo apt-get update
-      sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server
-      
-      # Create ubuntu2 user with default password
-      sudo useradd -m -s /bin/bash ubuntu2
-      echo "ubuntu2:vagrant" | sudo chpasswd
-      sudo usermod -aG sudo ubuntu2
-      echo "ubuntu2 ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
-      
-      # Worker welcome script
-      sudo tee /etc/profile.d/welcome.sh > /dev/null << 'EOF'
-#!/bin/bash
-clear
-echo ""
-figlet -f small "UBUNTU NODE 2" | lolcat
-echo ""
-echo "🔧 Controlled by Slade Master (192.168.56.10)" | lolcat
-echo "📊 Status: Ready for tasks" | lolcat
-echo "🌐 IP: $(hostname -I | awk '{print $1}')" | lolcat
-echo "👤 User: ubuntu2 | Password: vagrant" | lolcat
-echo ""
-neofetch --ascii_distro ubuntu_small
-echo ""
-EOF
-      
-      sudo chmod +x /etc/profile.d/welcome.sh
-      echo 'export PS1="\\[\\033[01;36m\\]ubuntu2\\[\\033[00m\\]@\\[\\033[01;34m\\]\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "' >> /home/vagrant/.bashrc
-      echo 'export PS1="\\[\\033[01;36m\\]ubuntu2\\[\\033[00m\\]@\\[\\033[01;34m\\]\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "' >> /home/ubuntu2/.bashrc
-    SHELL
-  end
 
-  # Ubuntu Node 3
-  config.vm.define "ubuntu3" do |worker|
-    worker.vm.hostname = "ubuntu3"
-    worker.vm.network "public_network", bridge: "auto"
-    worker.vm.network "private_network", ip: "192.168.56.13"
-    
-    worker.vm.provider "virtualbox" do |vb|
-      vb.name = "Ubuntu-Node-3"
-      vb.memory = 4096
-      vb.cpus = 1
-    end
-    
-    worker.vm.provision "shell", inline: <<-SHELL
-      sudo apt-get update
-      sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server
-      
-      # Create ubuntu3 user with default password
-      sudo useradd -m -s /bin/bash ubuntu3
-      echo "ubuntu3:vagrant" | sudo chpasswd
-      sudo usermod -aG sudo ubuntu3
-      echo "ubuntu3 ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
-      
-      # Worker welcome script
-      sudo tee /etc/profile.d/welcome.sh > /dev/null << 'EOF'
-#!/bin/bash
-clear
-echo ""
-figlet -f small "UBUNTU NODE 3" | lolcat
-echo ""
-echo "🔧 Controlled by Slade Master (192.168.56.10)" | lolcat
-echo "📊 Status: Ready for tasks" | lolcat
-echo "🌐 IP: $(hostname -I | awk '{print $1}')" | lolcat
-echo "👤 User: ubuntu3 | Password: vagrant" | lolcat
-echo ""
-neofetch --ascii_distro ubuntu_small
-echo ""
-EOF
-      
-      sudo chmod +x /etc/profile.d/welcome.sh
-      echo 'export PS1="\\[\\033[01;35m\\]ubuntu3\\[\\033[00m\\]@\\[\\033[01;34m\\]\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "' >> /home/vagrant/.bashrc
-      echo 'export PS1="\\[\\033[01;35m\\]ubuntu3\\[\\033[00m\\]@\\[\\033[01;34m\\]\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "' >> /home/ubuntu3/.bashrc
-    SHELL
-  end
 
   # Golden Fish Node
   config.vm.define "goldenfish" do |worker|
@@ -285,13 +245,32 @@ EOF
     
     worker.vm.provider "virtualbox" do |vb|
       vb.name = "Golden-Fish-Node"
-      vb.memory = 4096
+      vb.memory = 256
       vb.cpus = 1
+      # Ultra-minimal for Celeron with amnesia optimization
+      vb.customize ["modifyvm", :id, "--audio", "none"]
+      vb.customize ["modifyvm", :id, "--usb", "off"]
+      vb.customize ["modifyvm", :id, "--usbehci", "off"]
+      vb.customize ["modifyvm", :id, "--vram", "8"]
+      vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
+      vb.customize ["modifyvm", :id, "--hwvirtex", "on"]
+      vb.customize ["modifyvm", :id, "--nestedpaging", "on"]
     end
     
     worker.vm.provision "shell", inline: <<-SHELL
+      # Ultra-minimal package installation
+      export DEBIAN_FRONTEND=noninteractive
       sudo apt-get update
-      sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server cowsay fortune
+      sudo apt-get install -y --no-install-recommends git curl wget vim htop neofetch figlet lolcat openssh-server cowsay fortune-mod
+      
+      # Aggressive cleanup for amnesia node
+      sudo apt-get autoremove -y
+      sudo apt-get autoclean
+      sudo rm -rf /var/lib/apt/lists/*
+      sudo rm -rf /tmp/*
+      sudo rm -rf /var/tmp/*
+      sudo rm -rf /var/log/*
+      sudo journalctl --vacuum-size=1M
       
       # Create goldenfish user with default password
       sudo useradd -m -s /bin/bash goldenfish
@@ -299,31 +278,30 @@ EOF
       sudo usermod -aG sudo goldenfish
       echo "goldenfish ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
       
-      # AMNESIA CONFIGURATION - No persistent storage
-      # Mount tmpfs for user directories to make them volatile
-      echo "tmpfs /home/goldenfish tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=100M 0 0" >> /etc/fstab
-      echo "tmpfs /tmp tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=200M 0 0" >> /etc/fstab
+      # EXTREME AMNESIA CONFIGURATION - Ultra volatile
+      # Mount tmpfs for maximum volatility (smaller sizes)
+      echo "tmpfs /home/goldenfish tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=50M 0 0" >> /etc/fstab
+      echo "tmpfs /tmp tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=100M 0 0" >> /etc/fstab
+      echo "tmpfs /var/log tmpfs defaults,noatime,nosuid,nodev,noexec,mode=0755,size=10M 0 0" >> /etc/fstab
       
-      # Disable bash history permanently
+      # Disable all logging and history
       echo "unset HISTFILE" >> /home/goldenfish/.bashrc
       echo "export HISTSIZE=0" >> /home/goldenfish/.bashrc
       echo "export HISTFILESIZE=0" >> /home/goldenfish/.bashrc
       echo "set +o history" >> /home/goldenfish/.bashrc
       
-      # Disable system logging for this user
-      echo "goldenfish ALL=(ALL) NOPASSWD:ALL, !/usr/bin/logger, !/bin/logger" >> /etc/sudoers
-      
-      # Clear logs on startup script
+      # Ultra-aggressive cleanup script
       sudo tee /usr/local/bin/amnesia-cleanup > /dev/null << 'CLEANUP'
 #!/bin/bash
-# Clear all traces
-> /var/log/auth.log
-> /var/log/syslog
-> /var/log/kern.log
-> /home/goldenfish/.bash_history 2>/dev/null || true
-rm -rf /home/goldenfish/.cache/* 2>/dev/null || true
-rm -rf /home/goldenfish/.local/* 2>/dev/null || true
-echo "🧠💭 Amnesia activated - Memory wiped clean!" | logger
+# Nuclear cleanup - leave no trace
+> /var/log/auth.log 2>/dev/null || true
+> /var/log/syslog 2>/dev/null || true
+> /var/log/kern.log 2>/dev/null || true
+rm -rf /home/goldenfish/.* 2>/dev/null || true
+rm -rf /home/goldenfish/* 2>/dev/null || true
+rm -rf /tmp/* 2>/dev/null || true
+rm -rf /var/tmp/* 2>/dev/null || true
+sync
 CLEANUP
       
       sudo chmod +x /usr/local/bin/amnesia-cleanup

@@ -161,9 +161,9 @@ EOF
       sudo apt-get update
       sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server
       
-      # Create ubuntu1 user
+      # Create ubuntu1 user with default password
       sudo useradd -m -s /bin/bash ubuntu1
-      echo "ubuntu1:Slade@1452" | sudo chpasswd
+      echo "ubuntu1:vagrant" | sudo chpasswd
       sudo usermod -aG sudo ubuntu1
       echo "ubuntu1 ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
       
@@ -177,7 +177,7 @@ echo ""
 echo "🔧 Controlled by Slade Master (192.168.56.10)" | lolcat
 echo "📊 Status: Ready for tasks" | lolcat
 echo "🌐 IP: $(hostname -I | awk '{print $1}')" | lolcat
-echo "👤 User: ubuntu1 | Password: Slade@1452" | lolcat
+echo "👤 User: ubuntu1 | Password: vagrant" | lolcat
 echo ""
 neofetch --ascii_distro ubuntu_small
 echo ""
@@ -205,9 +205,9 @@ EOF
       sudo apt-get update
       sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server
       
-      # Create ubuntu2 user
+      # Create ubuntu2 user with default password
       sudo useradd -m -s /bin/bash ubuntu2
-      echo "ubuntu2:Slade@1452" | sudo chpasswd
+      echo "ubuntu2:vagrant" | sudo chpasswd
       sudo usermod -aG sudo ubuntu2
       echo "ubuntu2 ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
       
@@ -221,7 +221,7 @@ echo ""
 echo "🔧 Controlled by Slade Master (192.168.56.10)" | lolcat
 echo "📊 Status: Ready for tasks" | lolcat
 echo "🌐 IP: $(hostname -I | awk '{print $1}')" | lolcat
-echo "👤 User: ubuntu2 | Password: Slade@1452" | lolcat
+echo "👤 User: ubuntu2 | Password: vagrant" | lolcat
 echo ""
 neofetch --ascii_distro ubuntu_small
 echo ""
@@ -249,9 +249,9 @@ EOF
       sudo apt-get update
       sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server
       
-      # Create ubuntu3 user
+      # Create ubuntu3 user with default password
       sudo useradd -m -s /bin/bash ubuntu3
-      echo "ubuntu3:Slade@1452" | sudo chpasswd
+      echo "ubuntu3:vagrant" | sudo chpasswd
       sudo usermod -aG sudo ubuntu3
       echo "ubuntu3 ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
       
@@ -265,7 +265,7 @@ echo ""
 echo "🔧 Controlled by Slade Master (192.168.56.10)" | lolcat
 echo "📊 Status: Ready for tasks" | lolcat
 echo "🌐 IP: $(hostname -I | awk '{print $1}')" | lolcat
-echo "👤 User: ubuntu3 | Password: Slade@1452" | lolcat
+echo "👤 User: ubuntu3 | Password: vagrant" | lolcat
 echo ""
 neofetch --ascii_distro ubuntu_small
 echo ""
@@ -293,13 +293,45 @@ EOF
       sudo apt-get update
       sudo apt-get install -y build-essential git curl wget vim htop neofetch figlet lolcat openssh-server cowsay fortune
       
-      # Create goldenfish user
+      # Create goldenfish user with default password
       sudo useradd -m -s /bin/bash goldenfish
-      echo "goldenfish:Slade@1452" | sudo chpasswd
+      echo "goldenfish:vagrant" | sudo chpasswd
       sudo usermod -aG sudo goldenfish
       echo "goldenfish ALL=(ALL) NOPASSWD:ALL" | sudo tee -a /etc/sudoers
       
-      # Golden Fish welcome script with special animations
+      # AMNESIA CONFIGURATION - No persistent storage
+      # Mount tmpfs for user directories to make them volatile
+      echo "tmpfs /home/goldenfish tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=100M 0 0" >> /etc/fstab
+      echo "tmpfs /tmp tmpfs defaults,noatime,nosuid,nodev,noexec,mode=1777,size=200M 0 0" >> /etc/fstab
+      
+      # Disable bash history permanently
+      echo "unset HISTFILE" >> /home/goldenfish/.bashrc
+      echo "export HISTSIZE=0" >> /home/goldenfish/.bashrc
+      echo "export HISTFILESIZE=0" >> /home/goldenfish/.bashrc
+      echo "set +o history" >> /home/goldenfish/.bashrc
+      
+      # Disable system logging for this user
+      echo "goldenfish ALL=(ALL) NOPASSWD:ALL, !/usr/bin/logger, !/bin/logger" >> /etc/sudoers
+      
+      # Clear logs on startup script
+      sudo tee /usr/local/bin/amnesia-cleanup > /dev/null << 'CLEANUP'
+#!/bin/bash
+# Clear all traces
+> /var/log/auth.log
+> /var/log/syslog
+> /var/log/kern.log
+> /home/goldenfish/.bash_history 2>/dev/null || true
+rm -rf /home/goldenfish/.cache/* 2>/dev/null || true
+rm -rf /home/goldenfish/.local/* 2>/dev/null || true
+echo "🧠💭 Amnesia activated - Memory wiped clean!" | logger
+CLEANUP
+      
+      sudo chmod +x /usr/local/bin/amnesia-cleanup
+      
+      # Add cleanup to startup
+      echo "@reboot root /usr/local/bin/amnesia-cleanup" >> /etc/crontab
+      
+      # Golden Fish welcome script with amnesia warnings
       sudo tee /etc/profile.d/welcome.sh > /dev/null << 'EOF'
 #!/bin/bash
 clear
@@ -309,15 +341,19 @@ figlet -f big "GOLDEN FISH" | lolcat
 echo "🐠🐟🐡🦈🐠🐟🐡🦈🐠🐟🐡🦈🐠🐟🐡🦈🐠🐟🐡🦈" | lolcat
 echo ""
 echo "🏆 Special Golden Node - Premium Status" | lolcat
+echo "🧠 AMNESIA MODE: No persistent memory!" | lolcat
+echo "🚫 Files & history vanish on shutdown/reboot" | lolcat
+echo "🕵️  Untraceable operations - Leave no trace" | lolcat
 echo "🔧 Controlled by Slade Master (192.168.56.10)" | lolcat
-echo "📊 Status: Golden and Ready!" | lolcat
+echo "📊 Status: Golden and Volatile!" | lolcat
 echo "🌐 IP: $(hostname -I | awk '{print $1}')" | lolcat
-echo "👤 User: goldenfish | Password: Slade@1452" | lolcat
+echo "👤 User: goldenfish | Password: vagrant" | lolcat
 echo ""
 neofetch --ascii_distro ubuntu_small
 echo ""
 fortune | cowsay -f tux | lolcat
 echo ""
+echo "⚠️  WARNING: This session is VOLATILE - Nothing persists!" | lolcat
 echo "🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨🌟✨" | lolcat
 EOF
       

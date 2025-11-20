@@ -40,39 +40,39 @@ echo "║  Hostname: $(hostname)                                               �
 echo "║  User: $(whoami)                                                     ║" | lolcat
 echo "║  Date: $(date)                                                       ║" | lolcat
 echo "║                                                                      ║" | lolcat
-echo "║  Connected Nodes: worker1, worker2, worker3, worker4                ║" | lolcat
+echo "║  Connected Nodes: ubuntu1, ubuntu2, ubuntu3, goldenfish             ║" | lolcat
 echo "║  Control Panel: Available via SSH and Desktop                       ║" | lolcat
 echo "╚══════════════════════════════════════════════════════════════════════╝" | lolcat
 echo ""
 neofetch
 echo ""
 echo "Available Commands:" | lolcat
-echo "  • connect-worker1  : SSH to Worker Node 1" | lolcat
-echo "  • connect-worker2  : SSH to Worker Node 2" | lolcat
-echo "  • connect-worker3  : SSH to Worker Node 3" | lolcat
-echo "  • connect-worker4  : SSH to Worker Node 4" | lolcat
-echo "  • cluster-status   : Check all nodes status" | lolcat
-echo "  • deploy-all       : Deploy to all worker nodes" | lolcat
+echo "  • connect-ubuntu1   : SSH to Ubuntu Node 1" | lolcat
+echo "  • connect-ubuntu2   : SSH to Ubuntu Node 2" | lolcat
+echo "  • connect-ubuntu3   : SSH to Ubuntu Node 3" | lolcat
+echo "  • connect-goldenfish: SSH to Golden Fish Node" | lolcat
+echo "  • cluster-status    : Check all nodes status" | lolcat
+echo "  • deploy-all        : Deploy to all nodes" | lolcat
 echo ""
 EOF
       
       # Create connection scripts
-      sudo tee /usr/local/bin/connect-worker1 > /dev/null << 'EOF'
+      sudo tee /usr/local/bin/connect-ubuntu1 > /dev/null << 'EOF'
 #!/bin/bash
 ssh vagrant@192.168.56.11
 EOF
       
-      sudo tee /usr/local/bin/connect-worker2 > /dev/null << 'EOF'
+      sudo tee /usr/local/bin/connect-ubuntu2 > /dev/null << 'EOF'
 #!/bin/bash
 ssh vagrant@192.168.56.12
 EOF
       
-      sudo tee /usr/local/bin/connect-worker3 > /dev/null << 'EOF'
+      sudo tee /usr/local/bin/connect-ubuntu3 > /dev/null << 'EOF'
 #!/bin/bash
 ssh vagrant@192.168.56.13
 EOF
       
-      sudo tee /usr/local/bin/connect-worker4 > /dev/null << 'EOF'
+      sudo tee /usr/local/bin/connect-goldenfish > /dev/null << 'EOF'
 #!/bin/bash
 ssh vagrant@192.168.56.14
 EOF
@@ -81,26 +81,39 @@ EOF
 #!/bin/bash
 echo "Checking cluster status..." | lolcat
 for i in {11..14}; do
+  case $i in
+    11) name="Ubuntu1" ;;
+    12) name="Ubuntu2" ;;
+    13) name="Ubuntu3" ;;
+    14) name="GoldenFish" ;;
+  esac
   if ping -c 1 192.168.56.$i &> /dev/null; then
-    echo "✅ Worker$(($i-10)) (192.168.56.$i) - ONLINE" | lolcat
+    echo "✅ $name (192.168.56.$i) - ONLINE" | lolcat
   else
-    echo "❌ Worker$(($i-10)) (192.168.56.$i) - OFFLINE" | lolcat
+    echo "❌ $name (192.168.56.$i) - OFFLINE" | lolcat
   fi
 done
 EOF
       
       sudo tee /usr/local/bin/deploy-all > /dev/null << 'EOF'
 #!/bin/bash
-echo "Deploying to all worker nodes..." | lolcat
+echo "Deploying to all nodes..." | lolcat
 for i in {11..14}; do
-  echo "Deploying to Worker$(($i-10))..." | lolcat
+  case $i in
+    11) name="Ubuntu1" ;;
+    12) name="Ubuntu2" ;;
+    13) name="Ubuntu3" ;;
+    14) name="GoldenFish" ;;
+  esac
+  echo "Deploying to $name..." | lolcat
   # Add your deployment commands here
 done
 echo "Deployment completed!" | lolcat
 EOF
       
       # Make scripts executable
-      sudo chmod +x /usr/local/bin/connect-worker*
+      sudo chmod +x /usr/local/bin/connect-ubuntu*
+      sudo chmod +x /usr/local/bin/connect-goldenfish
       sudo chmod +x /usr/local/bin/cluster-status
       sudo chmod +x /usr/local/bin/deploy-all
       sudo chmod +x /etc/profile.d/welcome.sh
